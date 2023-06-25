@@ -20,7 +20,7 @@
 
 #include "huf.h"
 
-#define HUFCHARBITS 8 /* 8 bits per unsigned char */
+#define HUFCHARBITS 8 /* bits per unsigned char */
 
 /*
  * https://en.wikipedia.org/wiki/Huffman_coding
@@ -35,9 +35,9 @@
  *     ...
  *     octet lsb of original length
  *   octet number of bits/symbols sections (the maximum number of encoded bits)
- *     when 0, the remaining bytes are themselves
+ *     when 0, the remaining bytes are not encoded
  *   octet number of symbols for 1 bit
- *     when 1, the symbol is repeated for length
+ *     when 1, the symbol is repeated for length (run length encoded)
  *   octet symbols for 1 bit...
  *   octet number of symbols for 2 bit
  *   octet symbols for 2 bit...
@@ -53,11 +53,11 @@ hufEncode(
  ,const unsigned char *in
  ,hufLen ilen
 ){
-  hufLen l;
-  hufLen k;
+  hufLen l; /* output length */
   hufLen s[1 << HUFCHARBITS]; /* symbol count/code */
-  unsigned int i;
-  unsigned int j;
+  hufLen k; /* working hufLen */
+  unsigned int i; /* working unsigned int */
+  unsigned int j; /* working unsigned int */
   struct node {
     hufLen c;        /* count */
     unsigned char f; /* flag 0=bothNode 1=leftSym 2=rightSym 3=bothSym */
@@ -94,22 +94,33 @@ hufEncode(
   for (k = 0; k < ilen; ++k)
     ++s[*(in + k)];
 
-  /* only one non-zero count symbol? */
+  /* count non-zero symbols */
   for (i = j = 0; i < sizeof (s) / sizeof (s[0]); ++i)
     if (s[i]) {
-      if (++j > 1)
-        break;
-      else
-        h = i;
+      ++j;
+      h = i;
     }
-  /* if only one, output one and symbol */
+  /* if only one symbol, output one and the symbol */
   if (j == 1) {
     ++l;
     if (olen)
-      --olen, *out++ = j;
+      --olen, *out++ = 1;
     ++l;
     if (olen)
       --olen, *out++ = h;
+    return (l);
+  }
+  /* if input smaller than the smallest possible encoding (one bit per CHAR), output zero and the input */
+  if (ilen <= l + 2 + j + ilen / HUFCHARBITS) {
+noEncode:
+    ++l;
+    if (olen)
+      --olen, *out++ = 0;
+    for (; ilen; --ilen) {
+      ++l;
+      if (olen)
+        --olen, *out++ = *in++;
+    }
     return (l);
   }
 
@@ -220,19 +231,9 @@ hufEncode(
       break;
     i = p->p;
   }
-
-  /* if dense, output zero and un-encoded symbols */
-  if (m >= HUFCHARBITS) {
-    ++l;
-    if (olen)
-      --olen, *out++ = 0;
-    for (; ilen; --ilen) {
-      ++l;
-      if (olen)
-        --olen, *out++ = *in++;
-    }
-    return (l);
-  }
+  /* if minimum bits is HUFCHARBITS, don't encode */
+  if (m >= HUFCHARBITS)
+    goto noEncode;
 
   /* compute canonical huffman code */
   k = 0;
@@ -243,54 +244,77 @@ hufEncode(
     k <<= 1;
   }
 
+  { /* if encoding output becomes larger than the input, don't encode */
+  unsigned char *p;
+  hufLen o;
+
+  /* for rewinding output */
+  h = l;
+  p = out;
+  o = olen;
+
   /* output max bits */
   ++l;
-  if (olen)
-    --olen, *out++ = x;
+  if (o)
+    --o, *p++ = x;
 
   /* output bit counts */
   for (i = 1; i <= x; ++i) {
     for (j = m = 0; j < sizeof (b) / sizeof (b[0]); ++j)
       if (b[j] && b[j] == i)
         ++m;
-    ++l;
-    if (olen)
-      --olen, *out++ = m;
+    if (++l >= ilen) {
+      l = h;
+      goto noEncode;
+    }
+    if (o)
+      --o, *p++ = m;
 
     /* output symbols */
     for (j = 0; j < sizeof (b) / sizeof (b[0]); ++j)
       if (b[j] && b[j] == i) {
-        ++l;
-        if (olen)
-          --olen, *out++ = j;
+        if (++l >= ilen) {
+          l = h;
+          goto noEncode;
+        }
+        if (o)
+          --o, *p++ = j;
       }
   }
 
   /* encode */
-  for (i = 0; ilen; --ilen, ++in) {
+  for (k = i = 0; k < ilen; ++k) {
     if (i) {
-      i += b[*in];
+      i += b[*(in + k)];
       if (i < HUFCHARBITS) {
-        if (olen)
-          *out |= s[*in] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
+        if (o)
+          *p |= s[*(in + k)] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
         continue;
       }
       i -= HUFCHARBITS;
-      if (olen)
-        --olen, *out++ |= s[*in] >> i & ((1 << HUFCHARBITS) - 1);
+      if (o)
+        --o, *p++ |= s[*(in + k)] >> i & ((1 << HUFCHARBITS) - 1);
     } else
-      i = b[*in];
+      i = b[*(in + k)];
     for (; i >= HUFCHARBITS; i -= HUFCHARBITS) {
-      ++l;
-      if (olen)
-        --olen, *out++ = s[*in] >> (i - HUFCHARBITS) & ((1 << HUFCHARBITS) - 1);
+      if (++l >= ilen) {
+        l = h;
+        goto noEncode;
+      }
+      if (o)
+        --o, *p++ = s[*(in + k)] >> (i - HUFCHARBITS) & ((1 << HUFCHARBITS) - 1);
     }
     if (i) {
-      ++l;
-      if (olen)
-        *out = s[*in] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
+      if (++l >= ilen) {
+        l = h;
+        goto noEncode;
+      }
+      if (o)
+        *p = s[*(in + k)] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
     }
   }
+  }
+
   return (l);
 }
 
@@ -330,7 +354,7 @@ hufDecode(
     return (l);
 
   /* get number of bits/symbols */
-  if (!(c = *in++)) { /* dense */
+  if (!(c = *in++)) { /* noEncode */
     while (ilen-- && o--) {
       ++l;
       if (olen)
