@@ -30,10 +30,7 @@
  */
 
 /* the header of an encoded buffer is:
- *   octet of the number of octets of big endian original input length
- *     octet msb of original length
- *     ...
- *     octet lsb of original length
+ *   original input length encoded as a "varint" (https://en.wikipedia.org/wiki/Variable-length_quantity)
  *   octet number of bits/symbols sections (the maximum number of encoded bits)
  *     when 0, the remaining bytes are not encoded
  *   octet number of symbols for 1 bit
@@ -76,15 +73,23 @@ hufEncode(
     return (l);
 
   /* output length */
-  for (i = sizeof (ilen); i && !((ilen >> ((i - 1) * HUFCHARBITS)) & 0xff); --i);
+  for (i = sizeof (ilen); i; --i)
+    if (ilen >> (i * HUFCHARBITS - i)) {
+      do {
+        ++l;
+        if (olen) {
+          --olen;
+          if (i == sizeof (ilen))
+            *out++ = (1 << (HUFCHARBITS - 1)) | (ilen >> (sizeof (ilen) * HUFCHARBITS - sizeof (ilen)));
+          else
+            *out++ = (1 << (HUFCHARBITS - 1)) | ((ilen << (((sizeof (ilen) - 1) - i) * HUFCHARBITS + i + 1)) >> ((sizeof (ilen) - 1) * HUFCHARBITS + 1));
+        }
+      } while (--i);
+      break;
+    }
   ++l;
   if (olen)
-    --olen, *out++ = i;
-  while (i--) {
-    ++l;
-    if (olen)
-      --olen, *out++ = (ilen >> (i * HUFCHARBITS)) & 0xff;
-  }
+    --olen, *out++ = (ilen << ((sizeof (ilen) - 1) * HUFCHARBITS + 1)) >> ((sizeof (ilen) - 1) * HUFCHARBITS + 1);
 
   /* zero counts */
   for (i = 0; i < 1 << HUFCHARBITS; ++i)
@@ -346,9 +351,9 @@ hufDecode(
     return (l);
 
   /* get original buffer length */
-  for (o = 0; ilen && c; --ilen, --c) {
-    o <<= HUFCHARBITS;
-    o |= *in++;
+  for (o = c & ~(1 << (HUFCHARBITS - 1)); ilen && c & (1 << (HUFCHARBITS - 1)); --ilen) {
+    o <<= HUFCHARBITS - 1;
+    o |= (c = *in++) & ~(1 << (HUFCHARBITS - 1));
   }
   if (!ilen--)
     return (l);
