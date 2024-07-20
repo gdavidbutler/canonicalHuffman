@@ -30,7 +30,7 @@
  */
 
 /* the header of an encoded buffer is:
- *   original input length encoded as a "varint" (https://en.wikipedia.org/wiki/Variable-length_quantity)
+ *   original input length encoded as a (https://en.wikipedia.org/wiki/Variable-length_quantity#Removing_redundancy)
  *   octet number of bits/symbols sections (the maximum number of encoded bits)
  *     when 0, the remaining bytes are not encoded
  *   octet number of symbols for 1 bit
@@ -72,24 +72,19 @@ hufEncode(
   if (!ilen)
     return (l);
 
+  /* encode length */
+  b[(i = sizeof (b) - 1)] = (k = ilen) & ((1 << (HUFCHARBITS - 1)) - 1);
+  while (k >>= HUFCHARBITS - 1)
+    b[--i] = (1 << (HUFCHARBITS - 1)) | (--k & ((1 << (HUFCHARBITS - 1)) - 1));
+
   /* output length */
-  for (i = sizeof (ilen); i; --i)
-    if (ilen >> (i * HUFCHARBITS - i)) {
-      do {
-        ++l;
-        if (olen) {
-          --olen;
-          if (i == sizeof (ilen))
-            *out++ = (1 << (HUFCHARBITS - 1)) | (ilen >> (sizeof (ilen) * HUFCHARBITS - sizeof (ilen)));
-          else
-            *out++ = (1 << (HUFCHARBITS - 1)) | ((ilen << (((sizeof (ilen) - 1) - i) * HUFCHARBITS + i + 1)) >> ((sizeof (ilen) - 1) * HUFCHARBITS + 1));
-        }
-      } while (--i);
-      break;
+  for (; i < sizeof (b); ++i) {
+    ++l;
+    if (olen) {
+      --olen;
+      *out++ = b[i];
     }
-  ++l;
-  if (olen)
-    --olen, *out++ = (ilen << ((sizeof (ilen) - 1) * HUFCHARBITS + 1)) >> ((sizeof (ilen) - 1) * HUFCHARBITS + 1);
+  }
 
   /* zero counts */
   for (i = 0; i < 1 << HUFCHARBITS; ++i)
@@ -351,10 +346,8 @@ hufDecode(
     return (l);
 
   /* get original buffer length */
-  for (o = c & ~(1 << (HUFCHARBITS - 1)); ilen && c & (1 << (HUFCHARBITS - 1)); --ilen) {
-    o <<= HUFCHARBITS - 1;
-    o |= (c = *in++) & ~(1 << (HUFCHARBITS - 1));
-  }
+  for (o = c & ((1 << (HUFCHARBITS - 1)) - 1); ilen && c & (1 << (HUFCHARBITS - 1)); --ilen)
+    o = ((o + 1) << (HUFCHARBITS - 1)) | ((c = *in++) & ((1 << (HUFCHARBITS - 1)) - 1));
   if (!ilen--)
     return (l);
 
