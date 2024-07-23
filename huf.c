@@ -291,6 +291,10 @@ noEncode:
           *p |= s[*(in + k)] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
         continue;
       }
+      if (++l >= ilen) {
+        l = h;
+        goto noEncode;
+      }
       i -= HUFCHARBITS;
       if (o)
         --o, *p++ |= s[*(in + k)] >> i & ((1 << HUFCHARBITS) - 1);
@@ -304,14 +308,12 @@ noEncode:
       if (o)
         --o, *p++ = s[*(in + k)] >> (i - HUFCHARBITS) & ((1 << HUFCHARBITS) - 1);
     }
-    if (i) {
-      if (++l >= ilen) {
-        l = h;
-        goto noEncode;
-      }
-      if (o)
-        *p = s[*(in + k)] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
-    }
+    if (i && o)
+      *p = s[*(in + k)] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
+  }
+  if (i && ++l >= ilen) {
+    l = h;
+    goto noEncode;
   }
   }
 
@@ -347,7 +349,10 @@ hufDecode(
 
   /* get original buffer length */
   for (o = c & ((1 << (HUFCHARBITS - 1)) - 1); ilen && c & (1 << (HUFCHARBITS - 1)); --ilen)
-    o = ((o + 1) << (HUFCHARBITS - 1)) | ((c = *in++) & ((1 << (HUFCHARBITS - 1)) - 1));
+    if (!++o || o >> ((sizeof (o) - 1) * HUFCHARBITS + 1))
+      return (l);
+    else
+      o = (o << (HUFCHARBITS - 1)) | ((c = *in++) & ((1 << (HUFCHARBITS - 1)) - 1));
   if (!ilen--)
     return (l);
 
@@ -416,19 +421,17 @@ hufDecode(
   m = n = 0; /* bits of k from msb, bits of *in from lsb */
   k = 0;
   while (o--) {
-    while (m < sizeof (k) * HUFCHARBITS) { /* fill the table search value */
+    while (ilen && m < sizeof (k) * HUFCHARBITS) { /* fill the table search value */
       if (HUFCHARBITS <= sizeof (k) * HUFCHARBITS - m) { /* left shift */
         if (n) {
           k |= (*in++ << (HUFCHARBITS - n)) << ((sizeof (k) - 1) * HUFCHARBITS - m);
           m += n;
           n = 0;
-        } else if (!ilen)
-          break;
-        else {
+        } else {
           m += HUFCHARBITS;
           k |= *in++ << (sizeof (k) * HUFCHARBITS - m);
-          --ilen;
         }
+        --ilen;
       } else { /* right shift */
         if (n > (i = sizeof (k) * HUFCHARBITS - m)) {
           k |= (*in << (HUFCHARBITS - n)) >> (HUFCHARBITS - i);
@@ -439,13 +442,11 @@ hufDecode(
           k |= (*in++ << (HUFCHARBITS - n)) >> (HUFCHARBITS - i);
           m += n;
           n = 0;
-        } else if (!ilen)
-          break;
-        else {
+          --ilen;
+        } else {
           n = HUFCHARBITS - (sizeof (k) * HUFCHARBITS - m);
           k |= *in >> n;
           m = sizeof (k) * HUFCHARBITS;
-          --ilen;
         }
       }
     }

@@ -31,8 +31,8 @@ main(
 ,char *argv[]
 ){
   int fd;
-  unsigned long oz;
-  unsigned long sz;
+  long oz;
+  hufLen sz;
   unsigned char *ib;
   unsigned char *ob;
 
@@ -45,24 +45,42 @@ main(
     return (1);
   }
   oz = lseek(fd, 0, SEEK_END);
+  if (oz > (1L << sizeof (hufLen) * 8) - 1) {
+    fprintf(stderr, "%s: %s too big (%ld)\n", argv[0], argv[1], oz);
+    return (1);
+  }
   lseek(fd, 0, SEEK_SET);
   if (!(ib = malloc(oz))
    || !(ob = malloc(oz * 2))) {
     fprintf(stderr, "%s: malloc\n", argv[0]);
     return (1);
   }
-  if (read(fd, ib, oz) != (ssize_t)oz) {
+  if (read(fd, ib, oz) != oz) {
     fprintf(stderr, "%s: read fail on %s\n", argv[0], argv[1]);
     return (1);
   }
   close(fd);
-  sz = hufDecode(ob, oz * 2, ib, oz);
+  if (!(sz = hufDecode(ob, oz * 2, ib, oz))) {
+    fprintf(stderr, "%s: hufDecode %u\n", argv[0], sz);
+    return (1);
+  }
+  if (sz > oz * 2) {
+    free(ob);
+    if (!(ob = malloc(sz))) {
+      fprintf(stderr, "%s: malloc\n", argv[0]);
+      return (1);
+    }
+    fprintf(stderr, "%s: hufDecode trying %u\n", argv[0], sz);
+    if (!(sz = hufDecode(ob, sz, ib, oz))) {
+      fprintf(stderr, "%s: hufDecode %u\n", argv[0], sz);
+      return (1);
+    }
+  }
   free(ib);
-  if (fwrite(ob, 1, sz, stdout) != sz) {
+  if (write(1, ob, sz) != sz) {
     fprintf(stderr, "%s: write fail\n", argv[0]);
     return (1);
   }
   free(ob);
-  free(ib);
   return (0);
 }
