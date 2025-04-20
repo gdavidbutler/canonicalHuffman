@@ -23,6 +23,24 @@ typedef unsigned int hufLen;
 
 /* return 0 on error else the length of out */
 /* if length returned is more than length provided, allocate needed memory and retry */
+hufLen rleEncode(
+  unsigned char *out
+ ,hufLen olen
+ ,const unsigned char *in
+ ,hufLen ilen
+);
+
+/* return 0 on error else the length of out */
+/* if length returned is more than length provided, allocate needed memory and retry */
+hufLen rleDecode(
+  unsigned char *out
+ ,hufLen olen
+ ,const unsigned char *in
+ ,hufLen ilen
+);
+
+/* return 0 on error else the length of out */
+/* if length returned is more than length provided, allocate needed memory and retry */
 hufLen hufEncode(
   unsigned char *out
  ,hufLen olen

@@ -20,7 +20,75 @@
 
 #include "huf.h"
 
-#define HUFCHARBITS 8 /* bits per unsigned char */
+/* https://en.wikipedia.org/wiki/Run-length_encoding */
+
+hufLen
+rleEncode(
+  unsigned char *out
+ ,hufLen olen
+ ,const unsigned char *in
+ ,hufLen ilen
+){
+  hufLen l; /* output length */
+  unsigned int i;
+  unsigned char c;
+
+  l = 0;
+  if (!ilen)
+    return (l);
+
+  while (ilen--) {
+    c = *in++;
+    ++l;
+    if (olen)
+      --olen, *out++ = c;
+    for (i = 0; i < 256 && ilen && *in == c; ++i, --ilen, ++in);
+    if (i) {
+      l += 2;
+      if (olen)
+        --olen, *out++ = c;
+      if (olen)
+        --olen, *out++ = i - 1;
+    }
+  }
+  return (l);
+}
+
+hufLen
+rleDecode(
+  unsigned char *out
+ ,hufLen olen
+ ,const unsigned char *in
+ ,hufLen ilen
+){
+  hufLen l; /* output length */
+  unsigned int i;
+  unsigned char c;
+
+  l = 0;
+  if (!ilen)
+    return (l);
+
+  while (ilen--) {
+    c = *in++;
+    ++l;
+    if (olen)
+      --olen, *out++ = c;
+    if (ilen && c == *in) {
+      --ilen, ++in;
+      ++l;
+      if (olen)
+        --olen, *out++ = c;
+      if (ilen--)
+        for (i = *in++; i; --i) {
+          ++l;
+          if (olen)
+            --olen, *out++ = c;
+        }
+    }
+  }
+  return (l);
+}
 
 /*
  * https://en.wikipedia.org/wiki/Huffman_coding
@@ -28,6 +96,8 @@
  * a symbol is an unsigned char, 1 << HUFCHARBITS of them
  * the longest encoded value can be, up to, (1 << HUFCHARBITS) - 1 bits long
  */
+
+#define HUFCHARBITS 8 /* bits per unsigned char */
 
 /* the header of an encoded buffer is:
  *   original input length encoded as a (https://en.wikipedia.org/wiki/Variable-length_quantity#Removing_redundancy)

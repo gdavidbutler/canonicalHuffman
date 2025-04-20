@@ -36,17 +36,17 @@ main(
   unsigned char *ib;
   unsigned char *ob;
 
-  if (argc != 2) {
-    fprintf(stderr, "Usage: %s file\n", argv[0]);
+  if (argc != 3 || !argv[1] || !argv[2]) {
+    fprintf(stderr, "Usage: %s huf|rle file\n", argv[0]);
     return (1);
   }
-  if ((fd = open(argv[1], O_RDONLY)) < 0) {
-    fprintf(stderr, "%s: Can't open %s\n", argv[0], argv[1]);
+  if ((fd = open(argv[2], O_RDONLY)) < 0) {
+    fprintf(stderr, "%s: Can't open %s\n", argv[0], argv[2]);
     return (1);
   }
   oz = lseek(fd, 0, SEEK_END);
   if (oz > (1L << sizeof (hufLen) * 8) - 1) {
-    fprintf(stderr, "%s: %s too big (%ld)\n", argv[0], argv[1], oz);
+    fprintf(stderr, "%s: %s too big (%ld)\n", argv[0], argv[2], oz);
     return (1);
   }
   lseek(fd, 0, SEEK_SET);
@@ -56,13 +56,20 @@ main(
     return (1);
   }
   if (read(fd, ib, oz) != oz) {
-    fprintf(stderr, "%s: read fail on %s\n", argv[0], argv[1]);
+    fprintf(stderr, "%s: read fail on %s\n", argv[0], argv[2]);
     return (1);
   }
   close(fd);
-  if (!(sz = hufDecode(ob, oz * 2, ib, oz))) {
-    fprintf(stderr, "%s: hufDecode %u\n", argv[0], sz);
-    return (1);
+  if (*argv[1] == 'h') {
+    if (!(sz = hufDecode(ob, oz * 2, ib, oz))) {
+      fprintf(stderr, "%s: hufDecode %u\n", argv[0], sz);
+      return (1);
+    }
+  } else {
+    if (!(sz = rleDecode(ob, oz * 2, ib, oz))) {
+      fprintf(stderr, "%s: rleDecode %u\n", argv[0], sz);
+      return (1);
+    }
   }
   if (sz > oz * 2) {
     free(ob);
@@ -70,10 +77,16 @@ main(
       fprintf(stderr, "%s: malloc\n", argv[0]);
       return (1);
     }
-    fprintf(stderr, "%s: hufDecode trying %u\n", argv[0], sz);
-    if (!(sz = hufDecode(ob, sz, ib, oz))) {
-      fprintf(stderr, "%s: hufDecode %u\n", argv[0], sz);
-      return (1);
+    if (*argv[1] == 'h') {
+      if (!(sz = hufDecode(ob, sz, ib, oz))) {
+        fprintf(stderr, "%s: hufDecode %u\n", argv[0], sz);
+        return (1);
+      }
+    } else {
+      if (!(sz = rleDecode(ob, sz, ib, oz))) {
+        fprintf(stderr, "%s: rleDecode %u\n", argv[0], sz);
+        return (1);
+      }
     }
   }
   free(ib);
