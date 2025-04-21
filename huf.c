@@ -42,13 +42,13 @@ rleEncode(
     ++l;
     if (olen)
       --olen, *out++ = c;
-    for (i = 0; i < 256 && ilen && *in == c; ++i, --ilen, ++in);
-    if (i) {
+    if (ilen && *in == c) {
+      for (i = 0, --ilen, ++in; i < 255 && ilen && *in == c; ++i, --ilen, ++in);
       l += 2;
       if (olen)
         --olen, *out++ = c;
       if (olen)
-        --olen, *out++ = i - 1;
+        --olen, *out++ = i;
     }
   }
   return (l);
