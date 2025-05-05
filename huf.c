@@ -101,13 +101,13 @@ rleDecode(
 
 /* the header of an encoded buffer is:
  *   original input length encoded as a (https://en.wikipedia.org/wiki/Variable-length_quantity#Removing_redundancy)
- *   octet number of bits/symbols sections (the maximum number of encoded bits)
+ *   HUFCHARBITS sized number of bits/symbols sections (the maximum number of encoded bits)
  *     when 0, the remaining bytes are not encoded
- *   octet number of symbols for 1 bit
+ *   HUFCHARBITS sized number of symbols for 1 bit
  *     when 1, the symbol is repeated for length (run length encoded)
- *   octet symbols for 1 bit...
- *   octet number of symbols for 2 bit
- *   octet symbols for 2 bit...
+ *   HUFCHARBITS sized symbols for 1 bit...
+ *   HUFCHARBITS sized number of symbols for 2 bit
+ *   HUFCHARBITS sized symbols for 2 bit...
  *   ...
  * the body
  *   encoded data
