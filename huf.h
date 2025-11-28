@@ -18,6 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifndef __HUF_H__
+#define __HUF_H__
+
 /* typedef can be changed if needed (e.g. unsigned short, unsigned long, etc.) */
 typedef unsigned int hufLen;
 
@@ -56,3 +59,5 @@ hufLen hufDecode(
  ,const unsigned char *in
  ,hufLen ilen
 );
+
+#endif /* __HUF_H__ */
