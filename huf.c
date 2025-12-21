@@ -20,6 +20,8 @@
 
 #include "huf.h"
 
+#define HUFCHARBITS 8 /* bits per unsigned char */
+
 /* https://en.wikipedia.org/wiki/Run-length_encoding */
 
 hufLen
@@ -43,7 +45,7 @@ rleEncode(
     if (olen)
       --olen, *out++ = c;
     if (ilen && *in == c) {
-      for (i = 0, --ilen, ++in; i < 255 && ilen && *in == c; ++i, --ilen, ++in);
+      for (i = 0, --ilen, ++in; i < (1 << HUFCHARBITS) - 1 && ilen && *in == c; ++i, --ilen, ++in);
       l += 2;
       if (olen)
         --olen, *out++ = c;
@@ -79,12 +81,14 @@ rleDecode(
       ++l;
       if (olen)
         --olen, *out++ = c;
-      if (ilen--)
+      if (ilen) {
+        --ilen;
         for (i = *in++; i; --i) {
           ++l;
           if (olen)
             --olen, *out++ = c;
         }
+      }
     }
   }
   return (l);
@@ -96,8 +100,6 @@ rleDecode(
  * a symbol is an unsigned char, 1 << HUFCHARBITS of them
  * the longest encoded value can be, up to, (1 << HUFCHARBITS) - 1 bits long
  */
-
-#define HUFCHARBITS 8 /* bits per unsigned char */
 
 /* the header of an encoded buffer is:
  *   original input length encoded as a (https://en.wikipedia.org/wiki/Variable-length_quantity#Removing_redundancy)
@@ -520,8 +522,14 @@ hufDecode(
         }
       }
     }
+    /* validate enough bits for shortest code */
+    if (m < t[0].b)
+      return (0);
     /* search the table */
     for (i = 0; i < c && t[i].f <= k >> (sizeof (k) * HUFCHARBITS - t[i].b); ++i);
+    /* validate match found */
+    if (!i)
+      return (0);
     /* output the decoded symbol */
     --i;
     ++l;

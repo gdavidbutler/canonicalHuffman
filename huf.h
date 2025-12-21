@@ -24,7 +24,7 @@
 /* typedef can be changed if needed (e.g. unsigned short, unsigned long, etc.) */
 typedef unsigned int hufLen;
 
-/* return 0 on error else the length of out */
+/* return the length of out, 0 is error when ilen > 0 */
 /* if length returned is more than length provided, allocate needed memory and retry */
 hufLen rleEncode(
   unsigned char *out
@@ -33,7 +33,7 @@ hufLen rleEncode(
  ,hufLen ilen
 );
 
-/* return 0 on error else the length of out */
+/* return the length of out, 0 is error when ilen > 0 */
 /* if length returned is more than length provided, allocate needed memory and retry */
 hufLen rleDecode(
   unsigned char *out
@@ -42,7 +42,7 @@ hufLen rleDecode(
  ,hufLen ilen
 );
 
-/* return 0 on error else the length of out */
+/* return the length of out, 0 is error when ilen > 0 */
 /* if length returned is more than length provided, allocate needed memory and retry */
 hufLen hufEncode(
   unsigned char *out
@@ -51,7 +51,7 @@ hufLen hufEncode(
  ,hufLen ilen
 );
 
-/* return 0 on error else the length of out */
+/* return the length of out, 0 is error when ilen > 0 */
 /* if length returned is more than length provided, allocate needed memory and retry */
 hufLen hufDecode(
   unsigned char *out
