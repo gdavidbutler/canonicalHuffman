@@ -219,10 +219,7 @@ noEncode:
       n[t].f = 0; /* node */
       n[t].l = h;
       n[h].p = t;
-      if (h == sizeof (n) / sizeof (n[0]) - 1)
-        h = 0;
-      else
-        ++h;
+      ++h;
     }
 
     /* if the previous least count was used */
@@ -246,24 +243,15 @@ noEncode:
       n[t].c += n[h].c;
       n[t].r = h;
       n[h].p = t;
-      if (h == sizeof (n) / sizeof (n[0]) - 1)
-        h = 0;
-      else
-        ++h;
+      ++h;
     }
 
     /* to next tail */
-    if (t == sizeof (n) / sizeof (n[0]) - 1)
-      t = 0;
-    else
-      ++t;
+    ++t;
   }
 
   /* root is the previous tail */
-  if (!t)
-    t = sizeof (n) / sizeof (n[0]) - 1;
-  else
-    --t;
+  --t;
   n[t].p = t; /* root's parent is itself */
 
   /* generate symbol encoded bit lengths */
@@ -356,11 +344,14 @@ noEncode:
 
   /* encode */
   for (k = i = 0; k < ilen; ++k) {
+    unsigned char c;
+
+    c = *(in + k);
     if (i) {
-      i += b[*(in + k)];
+      i += b[c];
       if (i < HUFCHARBITS) {
         if (o)
-          *p |= s[*(in + k)] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
+          *p |= s[c] << (HUFCHARBITS - i);
         continue;
       }
       if (++l >= ilen) {
@@ -369,19 +360,19 @@ noEncode:
       }
       i -= HUFCHARBITS;
       if (o)
-        --o, *p++ |= s[*(in + k)] >> i & ((1 << HUFCHARBITS) - 1);
+        --o, *p++ |= s[c] >> i;
     } else
-      i = b[*(in + k)];
+      i = b[c];
     for (; i >= HUFCHARBITS; i -= HUFCHARBITS) {
       if (++l >= ilen) {
         l = h;
         goto noEncode;
       }
       if (o)
-        --o, *p++ = s[*(in + k)] >> (i - HUFCHARBITS) & ((1 << HUFCHARBITS) - 1);
+        --o, *p++ = s[c] >> (i - HUFCHARBITS);
     }
     if (i && o)
-      *p = s[*(in + k)] << (HUFCHARBITS - i) & ((1 << HUFCHARBITS) - 1);
+      *p = s[c] << (HUFCHARBITS - i);
   }
   if (i && ++l >= ilen) {
     l = h;
