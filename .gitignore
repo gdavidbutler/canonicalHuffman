@@ -53,6 +53,7 @@ dkms.conf
 
 # Local Executables
 COPYING.huf
+COPYING.rle
 COPYING.tst
 encode
 decode
